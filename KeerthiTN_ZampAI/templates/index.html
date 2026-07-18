@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Personalized Outreach Engine</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #10131a; --border: #262b36;
+    --text: #e6e8eb; --muted: #8b93a3; --accent: #5b8cff;
+    --good: #35c48c; --bad: #ff5b6a; --warn: #f3b13b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, sans-serif;
+    margin: 0; padding: 32px; line-height: 1.5;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  input {
+    width: 100%; padding: 9px 10px; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 14px;
+  }
+  textarea {
+    width: 100%; padding: 9px 10px; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 13px;
+    font-family: inherit; resize: vertical;
+  }
+  input[type="file"] { padding: 7px 8px; font-size: 12px; color: var(--muted); }
+  button {
+    margin-top: 18px; width: 100%; padding: 10px; background: var(--accent);
+    color: white; border: none; border-radius: 6px; font-size: 14px;
+    cursor: pointer; font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .section-title {
+    font-size: 11px; color: var(--accent); text-transform: uppercase;
+    letter-spacing: .04em; font-weight: 700; margin-bottom: 10px;
+  }
+  .status-line { display:flex; align-items:center; gap:8px; color: var(--muted); font-size: 13px; }
+  .spinner {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Prospect summary card */
+  .summary-card { display: none; margin-bottom: 18px; }
+  .summary-card.show { display: block; }
+  .summary-row { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+  .summary-block { flex: 1; min-width: 220px; }
+  .summary-label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  .summary-value { font-size: 14px; }
+  .snapshot-text { color: #cbd0d8; font-size: 13px; background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+  .signal-list { list-style: none; margin: 6px 0 0; padding: 0; }
+  .signal-list li { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .signal-list li:last-child { border-bottom: none; }
+  .cat-tag {
+    display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 4px; margin-right: 6px; letter-spacing: .03em;
+  }
+  .cat-news { background: rgba(91,140,255,0.15); color: var(--accent); }
+  .cat-hiring { background: rgba(53,196,140,0.15); color: var(--good); }
+  .cat-person_mention { background: rgba(243,177,59,0.15); color: var(--warn); }
+  .cat-company_overview { background: rgba(139,147,163,0.2); color: var(--muted); }
+  .cat-manual_context { background: rgba(91,140,255,0.25); color: #cfe0ff; }
+
+  .badge {
+    display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    font-weight: 600;
+  }
+  .badge.strong { background: rgba(53,196,140,0.15); color: var(--good); }
+  .badge.partial { background: rgba(243,177,59,0.15); color: var(--warn); }
+  .badge.weak { background: rgba(255,91,106,0.15); color: var(--bad); }
+  .badge.ready { background: rgba(53,196,140,0.15); color: var(--good); }
+  .badge.insufficient { background: rgba(255,91,106,0.15); color: var(--bad); }
+  .badge.flag { background: rgba(243,177,59,0.15); color: var(--warn); margin-left: 6px; }
+
+  /* Draft card */
+  .result-card {
+    margin-top: 4px; padding: 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel2); display: none;
+  }
+  .result-card.show { display: block; }
+  .subject { font-weight: 600; margin-bottom: 8px; font-size: 15px; }
+  .body-text { white-space: pre-wrap; color: #cbd0d8; font-size: 13px; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 12px; }
+  .meta a { color: var(--accent); }
+
+  /* Technical log (collapsible) */
+  details { margin-top: 18px; }
+  summary {
+    cursor: pointer; font-size: 12px; color: var(--muted); user-select: none;
+    padding: 6px 0;
+  }
+  summary:hover { color: var(--text); }
+  .stage-log { margin-top: 8px; max-height: 260px; overflow-y: auto; }
+  .stage-row {
+    display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px; font-family: ui-monospace, Menlo, monospace;
+  }
+  .stage-row:last-child { border-bottom: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex: none; }
+  .dot.start { background: var(--warn); }
+  .dot.done { background: var(--good); }
+  .dot.info { background: var(--muted); }
+  .dot.flag { background: var(--bad); }
+  .stage-name { color: var(--accent); font-weight: 600; text-transform: uppercase; font-size: 10px; }
+  .stage-detail { color: var(--muted); word-break: break-word; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .empty-state { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: rgba(91,140,255,0.06); }
+  .del-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+  }
+  .del-btn:hover { color: var(--bad); background: rgba(255,91,106,0.1); }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 20px;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body .field { margin-bottom: 12px; }
+  .modal-body .field-label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  .modal-body .field-value { font-size: 13px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <h1>Personalized Outreach Engine</h1>
+  <div class="sub">PS-3 &middot; prospect in, grounded draft out &middot; human reviews before send</div>
+
+  <div class="grid">
+    <div class="panel">
+      <label>Prospect name</label>
+      <input id="prospect_name" placeholder="e.g. Jordan Lee">
+      <label>Company</label>
+      <input id="company_name" placeholder="e.g. Northwind Analytics">
+      <label>Title (optional)</label>
+      <input id="title" placeholder="e.g. VP of Operations">
+      <label>Additional context (optional)</label>
+      <textarea id="manual_context" rows="4" placeholder="Paste anything you already know -- a LinkedIn bio, notes from a call, an intro email. Especially useful when research turns up little on its own."></textarea>
+      <label>Or upload a file (optional)</label>
+      <input id="context_file" type="file" accept=".pdf,.docx,.txt,.md">
+      <button id="runBtn" onclick="runPipeline()">Run process</button>
+    </div>
+
+    <div class="panel">
+      <div id="statusLine" class="status-line" style="display:none;">
+        <div class="spinner"></div><span id="statusText">Working...</span>
+      </div>
+      <div id="idleState" class="empty-state">Enter a prospect and run the process to see results here.</div>
+
+      <!-- Prospect summary card -->
+      <div class="summary-card" id="summaryCard">
+        <div class="section-title">Prospect Summary</div>
+        <div class="summary-row">
+          <div class="summary-block">
+            <div class="summary-label">Company snapshot</div>
+            <div class="snapshot-text" id="companySnapshot">-</div>
+          </div>
+          <div class="summary-block">
+            <div class="summary-label">Identification confidence</div>
+            <div class="summary-value"><span class="badge" id="idBadge">-</span></div>
+            <div class="summary-label" style="margin-top:10px;">Company website</div>
+            <div class="summary-value"><a id="companySite" href="#" target="_blank" style="color:var(--accent)">-</a></div>
+          </div>
+        </div>
+        <div class="summary-label">Top signals found</div>
+        <ul class="signal-list" id="signalList"></ul>
+      </div>
+
+      <!-- Draft card -->
+      <div class="result-card" id="resultCard">
+        <div class="subject" id="resultSubject"></div>
+        <div class="body-text" id="resultBody"></div>
+        <div class="meta" id="resultMeta"></div>
+      </div>
+
+      <details id="logDetails">
+        <summary>Show technical log (research → business rules → generation)</summary>
+        <div class="stage-log" id="stageLog"></div>
+      </details>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px;">
+    <div class="section-title">Dashboard &middot; run history</div>
+    <div style="color:var(--muted); font-size:12px; margin-bottom:6px;">Click a row to view the full draft. Click × to delete.</div>
+    <table id="historyTable">
+      <thead>
+        <tr><th>Time</th><th>Prospect</th><th>Company</th><th>Status</th><th>Hook source</th><th>Match</th><th>Flags</th><th>Subject</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Detail modal -->
+  <div id="modalOverlay" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div id="modalTitle" class="modal-title"></div>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
+  </div>
+
+<script>
+const CAT_LABELS = {news: 'News', hiring: 'Hiring', person_mention: 'Person mention', company_overview: 'Company overview', manual_context: 'Provided by you'};
+
+async function runPipeline() {
+  const prospect_name = document.getElementById('prospect_name').value.trim();
+  const company_name = document.getElementById('company_name').value.trim();
+  const title = document.getElementById('title').value.trim();
+  const manual_context = document.getElementById('manual_context').value.trim();
+  const contextFileInput = document.getElementById('context_file');
+  if (!prospect_name || !company_name) { alert('Prospect name and company are required.'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'Running...';
+  document.getElementById('idleState').style.display = 'none';
+  document.getElementById('statusLine').style.display = 'flex';
+  document.getElementById('summaryCard').classList.remove('show');
+  document.getElementById('resultCard').classList.remove('show');
+  document.getElementById('stageLog').innerHTML = '';
+
+  const formData = new FormData();
+  formData.append('prospect_name', prospect_name);
+  formData.append('company_name', company_name);
+  formData.append('title', title);
+  formData.append('manual_context', manual_context);
+  if (contextFileInput.files[0]) formData.append('context_file', contextFileInput.files[0]);
+
+  const resp = await fetch('/api/run', {
+    method: 'POST',
+    body: formData
+  });
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalOutput = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const evt = JSON.parse(line);
+      appendStage(evt);
+      updateStatusText(evt);
+      if (evt.stage === 'prospect_summary' && evt.status === 'done') showSummary(evt.detail);
+      if (evt.stage === 'output' && evt.status === 'done') finalOutput = evt.detail;
+      if (evt.stage === 'done') finalOutput = { status: evt.status, ...(typeof evt.detail === 'object' ? evt.detail : {}) };
+      if (evt.stage === 'error') showError(evt.detail);
+    }
+  }
+
+  document.getElementById('statusLine').style.display = 'none';
+  if (finalOutput) showResult(finalOutput);
+  btn.disabled = false; btn.textContent = 'Run process';
+  loadHistory();
+}
+
+function updateStatusText(evt) {
+  const labels = {
+    research: 'Researching company, news, hiring, and mentions...',
+    prospect_summary: 'Assembling prospect summary...',
+    signal_extraction: 'Ranking candidate hooks...',
+    business_rules: 'Applying policy filters...',
+    draft_generation: 'Writing personalized draft...',
+  };
+  if (labels[evt.stage] && evt.status === 'start') {
+    document.getElementById('statusText').textContent = labels[evt.stage];
+  }
+}
+
+function appendStage(evt) {
+  const log = document.getElementById('stageLog');
+  const row = document.createElement('div');
+  row.className = 'stage-row';
+  const detail = typeof evt.detail === 'object' ? JSON.stringify(evt.detail) : (evt.detail || '');
+  row.innerHTML = `<div class="dot ${evt.status}"></div>
+    <div><div class="stage-name">${evt.stage.replace(/_/g,' ')} &middot; ${evt.status}</div>
+    <div class="stage-detail">${detail}</div></div>`;
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+}
+
+function idBadgeClass(label) {
+  if (label === 'Strong match') return 'strong';
+  if (label === 'Partial match') return 'partial';
+  return 'weak';
+}
+
+function showSummary(summary) {
+  const card = document.getElementById('summaryCard');
+  document.getElementById('companySnapshot').textContent = summary.company_snapshot || 'No public overview found.';
+  const idBadge = document.getElementById('idBadge');
+  idBadge.textContent = `${summary.identification_label} (${Math.round(summary.identification_score * 100)}%)`;
+  idBadge.className = 'badge ' + idBadgeClass(summary.identification_label);
+  const site = document.getElementById('companySite');
+  if (summary.company_website) {
+    site.href = summary.company_website; site.textContent = summary.company_website;
+  } else {
+    site.href = '#'; site.textContent = 'Not found';
+  }
+  const list = document.getElementById('signalList');
+  list.innerHTML = (summary.top_signals || []).map(s => `
+    <li><span class="cat-tag cat-${s.category}">${CAT_LABELS[s.category] || s.category}</span>${s.text || '(untitled)'}</li>
+  `).join('') || '<li style="color:var(--muted)">No signals found.</li>';
+  card.classList.add('show');
+}
+
+function showError(message) {
+  const card = document.getElementById('resultCard');
+  document.getElementById('resultSubject').innerHTML = 'Something went wrong <span class="badge insufficient">error</span>';
+  document.getElementById('resultBody').textContent = message || 'The process hit an unexpected error. Check the technical log below for details.';
+  document.getElementById('resultMeta').textContent = '';
+  card.classList.add('show');
+  document.getElementById('logDetails').open = true;
+}
+
+function showResult(out) {
+  const card = document.getElementById('resultCard');
+  if (out.status === 'insufficient_signal') {
+    document.getElementById('resultSubject').innerHTML = 'No draft generated <span class="badge insufficient">insufficient signal</span>';
+    document.getElementById('resultBody').textContent = 'No on-policy signal cleared the confidence/sentiment filters. Flagged for manual research instead of guessing.';
+    document.getElementById('resultMeta').textContent = '';
+  } else {
+    const flagBadges = (out.flags || []).map(f => `<span class="badge flag">${f.replace(/_/g,' ')}</span>`).join('');
+    document.getElementById('resultSubject').innerHTML = `${out.subject} <span class="badge ready">ready for review</span>${flagBadges}`;
+    document.getElementById('resultBody').textContent = out.body;
+    const catTag = out.hook_category ? `<span class="cat-tag cat-${out.hook_category}">${CAT_LABELS[out.hook_category] || out.hook_category}</span>` : '';
+    document.getElementById('resultMeta').innerHTML =
+      `${catTag}Confidence: ${Math.round((out.confidence||0)*100)}% &middot; ` +
+      (out.source_url ? `<a href="${out.source_url}" target="_blank">source</a>` : 'no source url');
+  }
+  card.classList.add('show');
+}
+
+let HISTORY_ROWS = [];
+
+async function loadHistory() {
+  const rows = await (await fetch('/api/history')).json();
+  HISTORY_ROWS = rows;
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr onclick="openModal(${r.id})">
+      <td>${new Date(r.timestamp).toLocaleString()}</td>
+      <td>${r.prospect_name}</td>
+      <td>${r.company_name}</td>
+      <td>${r.status}</td>
+      <td>${r.hook_category ? (CAT_LABELS[r.hook_category] || r.hook_category) : '-'}</td>
+      <td>${r.id_label || '-'}</td>
+      <td>${r.flags || '-'}</td>
+      <td>${r.subject || '-'}</td>
+      <td><button class="del-btn" onclick="event.stopPropagation(); deleteRun(${r.id})" title="Delete">&times;</button></td>
+    </tr>`).join('') || `<tr><td colspan="9" class="empty-state">No runs yet.</td></tr>`;
+}
+
+function openModal(id) {
+  const r = HISTORY_ROWS.find(row => row.id === id);
+  if (!r) return;
+  document.getElementById('modalTitle').textContent = `${r.prospect_name} @ ${r.company_name}`;
+  const flagBadges = (r.flags ? r.flags.split(',').filter(Boolean) : [])
+    .map(f => `<span class="badge flag">${f.replace(/_/g,' ')}</span>`).join('');
+  const catLabel = r.hook_category ? (CAT_LABELS[r.hook_category] || r.hook_category) : '-';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="field"><div class="field-label">Status</div>
+      <div class="field-value">${r.status} ${flagBadges}</div></div>
+    <div class="field"><div class="field-label">Company snapshot</div>
+      <div class="field-value">${r.company_snapshot || '-'}</div></div>
+    <div class="field"><div class="field-label">Hook used</div>
+      <div class="field-value">[${catLabel}] ${r.hook || '-'} &middot; confidence ${Math.round((r.confidence||0)*100)}% &middot; identification: ${r.id_label || '-'}</div></div>
+    <div class="field"><div class="field-label">Subject</div>
+      <div class="field-value">${r.subject || '-'}</div></div>
+    <div class="field"><div class="field-label">Body</div>
+      <div class="field-value">${r.body || '(no draft -- insufficient signal)'}</div></div>
+    <div class="field"><div class="field-label">Source</div>
+      <div class="field-value">${r.source_url ? `<a href="${r.source_url}" target="_blank" style="color:var(--accent)">${r.source_url}</a>` : '-'}</div></div>
+  `;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modalOverlay') closeModal();
+});
+
+async function deleteRun(id) {
+  if (!confirm('Delete this run from history?')) return;
+  await fetch(`/api/history/${id}`, { method: 'DELETE' });
+  loadHistory();
+}
+
+loadHistory();
+</script>
+</body>
+</html>
