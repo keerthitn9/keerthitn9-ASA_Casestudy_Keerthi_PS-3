@@ -13,13 +13,14 @@ shouldn't guess.
 ## Setup
 
 ```bash
-cd ps3-outreach
-pip install -r requirements.txt --break-system-packages   # drop the flag on a normal machine
+cd ps3-reachout
+pip install -r requirements.txt --break-system-packages
 
 # Optional but recommended — real LLM instead of the rule-based fallback:
 # 1. Install Ollama: https://ollama.com/download
 # 2. ollama pull llama3.2
 # 3. Ollama usually runs as a background service after install
+# 4. create a virtual environment if running locally
 
 python app.py
 ```
